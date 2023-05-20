@@ -1,0 +1,43 @@
+Fix AVL tree traversal in cache_record_find() and cache_host_is_known():
+
+The AVL tree traversal in both functions systematically misses the last
+AVL tree element. This can lead to duplicate cache entries and lookup failures.
+
+The fix duplicates the correct AVL tree traversal approach of cache_dump_recursive().
+
+Signed-off-by: Martin Röder <mroeder@metz-connect.com>
+
+--- a/cache.c
++++ b/cache.c
+@@ -191,13 +191,10 @@ cache_record_find(char *record, int type
+ {
+ 	struct cache_record *l = avl_find_element(&records, record, l, avl);
+ 
+-	if (!l)
+-		return NULL;
+-
+-	while (l && !avl_is_last(&records, &l->avl) && !strcmp(l->record, record)) {
++	while (l && !strcmp(l->record, record)) {
+ 		struct cache_record *r = l;
+ 
+-		l = avl_next_element(l, avl);
++		l = !avl_is_last(&records, &l->avl) ? avl_next_element(l, avl) : NULL;
+ 		if (r->type != type)
+ 			continue;
+ 
+@@ -227,13 +224,10 @@ cache_host_is_known(char *record)
+ {
+ 	struct cache_record *l = avl_find_element(&records, record, l, avl);
+ 
+-	if (!l)
+-		return 0;
+-
+-	while (l && !avl_is_last(&records, &l->avl) && !strcmp(l->record, record)) {
++	while (l && !strcmp(l->record, record)) {
+ 		struct cache_record *r = l;
+ 
+-		l = avl_next_element(l, avl);
++		l = !avl_is_last(&records, &l->avl) ? avl_next_element(l, avl) : NULL;
+ 		if ((r->type != TYPE_A) && (r->type != TYPE_AAAA))
+ 			continue;
+ 		return 1;
