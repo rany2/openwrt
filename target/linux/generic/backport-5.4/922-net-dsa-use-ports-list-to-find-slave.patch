@@ -1,0 +1,55 @@
+From 7b9a2f4bac68e1dcc77baebd8c1e32d43710bafa Mon Sep 17 00:00:00 2001
+From: Vivien Didelot <vivien.didelot@gmail.com>
+Date: Mon, 21 Oct 2019 16:51:18 -0400
+Subject: [PATCH 04/16] net: dsa: use ports list to find slave
+
+Use the new ports list instead of iterating over switches and their
+ports when looking for a slave device from a given master interface.
+
+Signed-off-by: Vivien Didelot <vivien.didelot@gmail.com>
+Reviewed-by: Florian Fainelli <f.fainelli@gmail.com>
+Reviewed-by: Andrew Lunn <andrew@lunn.ch>
+Signed-off-by: Jakub Kicinski <jakub.kicinski@netronome.com>
+---
+ net/dsa/dsa_priv.h | 23 ++++++-----------------
+ 1 file changed, 6 insertions(+), 17 deletions(-)
+
+diff --git a/net/dsa/dsa_priv.h b/net/dsa/dsa_priv.h
+index 12f8c7ee4dd8..53e7577896b6 100644
+--- a/net/dsa/dsa_priv.h
++++ b/net/dsa/dsa_priv.h
+@@ -104,25 +104,14 @@ static inline struct net_device *dsa_master_find_slave(struct net_device *dev,
+ {
+ 	struct dsa_port *cpu_dp = dev->dsa_ptr;
+ 	struct dsa_switch_tree *dst = cpu_dp->dst;
+-	struct dsa_switch *ds;
+-	struct dsa_port *slave_port;
++	struct dsa_port *dp;
+ 
+-	if (device < 0 || device >= DSA_MAX_SWITCHES)
+-		return NULL;
++	list_for_each_entry(dp, &dst->ports, list)
++		if (dp->ds->index == device && dp->index == port &&
++		    dp->type == DSA_PORT_TYPE_USER)
++			return dp->slave;
+ 
+-	ds = dst->ds[device];
+-	if (!ds)
+-		return NULL;
+-
+-	if (port < 0 || port >= ds->num_ports)
+-		return NULL;
+-
+-	slave_port = &ds->ports[port];
+-
+-	if (unlikely(slave_port->type != DSA_PORT_TYPE_USER))
+-		return NULL;
+-
+-	return slave_port->slave;
++	return NULL;
+ }
+ 
+ /* port.c */
+-- 
+2.34.1
+

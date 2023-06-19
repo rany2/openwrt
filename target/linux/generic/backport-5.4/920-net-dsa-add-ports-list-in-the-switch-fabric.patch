@@ -1,0 +1,157 @@
+From ab8ccae122a41530a89bc899ace0e46defb156a8 Mon Sep 17 00:00:00 2001
+From: Vivien Didelot <vivien.didelot@gmail.com>
+Date: Mon, 21 Oct 2019 16:51:16 -0400
+Subject: [PATCH 02/16] net: dsa: add ports list in the switch fabric
+
+Add a list of switch ports within the switch fabric. This will help the
+lookup of a port inside the whole fabric, and it is the first step
+towards supporting multiple CPU ports, before deprecating the usage of
+the unique dst->cpu_dp pointer.
+
+In preparation for a future allocation of the dsa_port structures,
+return -ENOMEM in case no structure is returned, even though this
+error cannot be reached yet.
+
+Signed-off-by: Vivien Didelot <vivien.didelot@gmail.com>
+Reviewed-by: Florian Fainelli <f.fainelli@gmail.com>
+Reviewed-by: Andrew Lunn <andrew@lunn.ch>
+Signed-off-by: Jakub Kicinski <jakub.kicinski@netronome.com>
+---
+ include/net/dsa.h |  5 +++++
+ net/dsa/dsa2.c    | 48 +++++++++++++++++++++++++++++++++++++++++------
+ 2 files changed, 47 insertions(+), 6 deletions(-)
+
+diff --git a/include/net/dsa.h b/include/net/dsa.h
+index 2e4fe2f8962b..6ff6dfcdc61d 100644
+--- a/include/net/dsa.h
++++ b/include/net/dsa.h
+@@ -125,6 +125,9 @@ struct dsa_switch_tree {
+ 	 */
+ 	struct dsa_port		*cpu_dp;
+ 
++	/* List of switch ports */
++	struct list_head ports;
++
+ 	/*
+ 	 * Data for the individual switch chips.
+ 	 */
+@@ -195,6 +198,8 @@ struct dsa_port {
+ 	struct work_struct	xmit_work;
+ 	struct sk_buff_head	xmit_queue;
+ 
++	struct list_head list;
++
+ 	/*
+ 	 * Give the switch driver somewhere to hang its per-port private data
+ 	 * structures (accessible from the tagger).
+diff --git a/net/dsa/dsa2.c b/net/dsa/dsa2.c
+index 1716535167ee..ba27ff8b4445 100644
+--- a/net/dsa/dsa2.c
++++ b/net/dsa/dsa2.c
+@@ -45,6 +45,8 @@ static struct dsa_switch_tree *dsa_tree_alloc(int index)
+ 
+ 	dst->index = index;
+ 
++	INIT_LIST_HEAD(&dst->ports);
++
+ 	INIT_LIST_HEAD(&dst->list);
+ 	list_add_tail(&dst->list, &dsa_tree_list);
+ 
+@@ -616,6 +618,22 @@ static int dsa_tree_add_switch(struct dsa_switch_tree *dst,
+ 	return err;
+ }
+ 
++static struct dsa_port *dsa_port_touch(struct dsa_switch *ds, int index)
++{
++	struct dsa_switch_tree *dst = ds->dst;
++	struct dsa_port *dp;
++
++	dp = &ds->ports[index];
++
++	dp->ds = ds;
++	dp->index = index;
++
++	INIT_LIST_HEAD(&dp->list);
++	list_add_tail(&dp->list, &dst->ports);
++
++	return dp;
++}
++
+ static int dsa_port_parse_user(struct dsa_port *dp, const char *name)
+ {
+ 	if (!name)
+@@ -742,6 +760,20 @@ static int dsa_switch_parse_member_of(struct dsa_switch *ds,
+ 	return 0;
+ }
+ 
++static int dsa_switch_touch_ports(struct dsa_switch *ds)
++{
++	struct dsa_port *dp;
++	int port;
++
++	for (port = 0; port < ds->num_ports; port++) {
++		dp = dsa_port_touch(ds, port);
++		if (!dp)
++			return -ENOMEM;
++	}
++
++	return 0;
++}
++
+ static int dsa_switch_parse_of(struct dsa_switch *ds, struct device_node *dn)
+ {
+ 	int err;
+@@ -750,6 +782,10 @@ static int dsa_switch_parse_of(struct dsa_switch *ds, struct device_node *dn)
+ 	if (err)
+ 		return err;
+ 
++	err = dsa_switch_touch_ports(ds);
++	if (err)
++		return err;
++
+ 	return dsa_switch_parse_ports_of(ds, dn);
+ }
+ 
+@@ -807,6 +843,8 @@ static int dsa_switch_parse_ports(struct dsa_switch *ds,
+ 
+ static int dsa_switch_parse(struct dsa_switch *ds, struct dsa_chip_data *cd)
+ {
++	int err;
++
+ 	ds->cd = cd;
+ 
+ 	/* We don't support interconnected switches nor multiple trees via
+@@ -817,6 +855,10 @@ static int dsa_switch_parse(struct dsa_switch *ds, struct dsa_chip_data *cd)
+ 	if (!ds->dst)
+ 		return -ENOMEM;
+ 
++	err = dsa_switch_touch_ports(ds);
++	if (err)
++		return err;
++
+ 	return dsa_switch_parse_ports(ds, cd);
+ }
+ 
+@@ -849,7 +891,6 @@ static int dsa_switch_probe(struct dsa_switch *ds)
+ struct dsa_switch *dsa_switch_alloc(struct device *dev, size_t n)
+ {
+ 	struct dsa_switch *ds;
+-	int i;
+ 
+ 	ds = devm_kzalloc(dev, struct_size(ds, ports, n), GFP_KERNEL);
+ 	if (!ds)
+@@ -858,11 +899,6 @@ struct dsa_switch *dsa_switch_alloc(struct device *dev, size_t n)
+ 	ds->dev = dev;
+ 	ds->num_ports = n;
+ 
+-	for (i = 0; i < ds->num_ports; ++i) {
+-		ds->ports[i].index = i;
+-		ds->ports[i].ds = ds;
+-	}
+-
+ 	return ds;
+ }
+ EXPORT_SYMBOL_GPL(dsa_switch_alloc);
+-- 
+2.34.1
+

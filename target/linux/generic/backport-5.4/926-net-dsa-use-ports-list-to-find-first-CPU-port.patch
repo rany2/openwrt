@@ -1,0 +1,48 @@
+From c0b736282ccf6d9450f3bed55a134f2123a7a565 Mon Sep 17 00:00:00 2001
+From: Vivien Didelot <vivien.didelot@gmail.com>
+Date: Mon, 21 Oct 2019 16:51:23 -0400
+Subject: [PATCH 09/16] net: dsa: use ports list to find first CPU port
+
+Use the new ports list instead of iterating over switches and their
+ports when looking up the first CPU port in the tree.
+
+Signed-off-by: Vivien Didelot <vivien.didelot@gmail.com>
+Reviewed-by: Florian Fainelli <f.fainelli@gmail.com>
+Signed-off-by: Jakub Kicinski <jakub.kicinski@netronome.com>
+---
+ net/dsa/dsa2.c | 17 +++--------------
+ 1 file changed, 3 insertions(+), 14 deletions(-)
+
+diff --git a/net/dsa/dsa2.c b/net/dsa/dsa2.c
+index 514c0195e2e8..80191c7702a9 100644
+--- a/net/dsa/dsa2.c
++++ b/net/dsa/dsa2.c
+@@ -186,22 +186,11 @@ static bool dsa_tree_setup_routing_table(struct dsa_switch_tree *dst)
+ 
+ static struct dsa_port *dsa_tree_find_first_cpu(struct dsa_switch_tree *dst)
+ {
+-	struct dsa_switch *ds;
+ 	struct dsa_port *dp;
+-	int device, port;
+-
+-	for (device = 0; device < DSA_MAX_SWITCHES; device++) {
+-		ds = dst->ds[device];
+-		if (!ds)
+-			continue;
+ 
+-		for (port = 0; port < ds->num_ports; port++) {
+-			dp = &ds->ports[port];
+-
+-			if (dsa_port_is_cpu(dp))
+-				return dp;
+-		}
+-	}
++	list_for_each_entry(dp, &dst->ports, list)
++		if (dsa_port_is_cpu(dp))
++			return dp;
+ 
+ 	return NULL;
+ }
+-- 
+2.34.1
+

@@ -1,0 +1,48 @@
+From 764b7e624284c3f41bdd15bd4e077d8ec5b8c686 Mon Sep 17 00:00:00 2001
+From: Vivien Didelot <vivien.didelot@gmail.com>
+Date: Mon, 21 Oct 2019 16:51:21 -0400
+Subject: [PATCH 07/16] net: dsa: use ports list to find a port by node
+
+Use the new ports list instead of iterating over switches and their
+ports to find a port from a given node.
+
+Signed-off-by: Vivien Didelot <vivien.didelot@gmail.com>
+Reviewed-by: Florian Fainelli <f.fainelli@gmail.com>
+Signed-off-by: Jakub Kicinski <jakub.kicinski@netronome.com>
+---
+ net/dsa/dsa2.c | 17 +++--------------
+ 1 file changed, 3 insertions(+), 14 deletions(-)
+
+diff --git a/net/dsa/dsa2.c b/net/dsa/dsa2.c
+index 623805ba8e1a..a4de7ff8b19b 100644
+--- a/net/dsa/dsa2.c
++++ b/net/dsa/dsa2.c
+@@ -113,22 +113,11 @@ static bool dsa_port_is_user(struct dsa_port *dp)
+ static struct dsa_port *dsa_tree_find_port_by_node(struct dsa_switch_tree *dst,
+ 						   struct device_node *dn)
+ {
+-	struct dsa_switch *ds;
+ 	struct dsa_port *dp;
+-	int device, port;
+-
+-	for (device = 0; device < DSA_MAX_SWITCHES; device++) {
+-		ds = dst->ds[device];
+-		if (!ds)
+-			continue;
+ 
+-		for (port = 0; port < ds->num_ports; port++) {
+-			dp = &ds->ports[port];
+-
+-			if (dp->dn == dn)
+-				return dp;
+-		}
+-	}
++	list_for_each_entry(dp, &dst->ports, list)
++		if (dp->dn == dn)
++			return dp;
+ 
+ 	return NULL;
+ }
+-- 
+2.34.1
+

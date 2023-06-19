@@ -1,0 +1,94 @@
+From da4561cda2ea6240fc61442eeb2acc47e2e0cae3 Mon Sep 17 00:00:00 2001
+From: Vivien Didelot <vivien.didelot@gmail.com>
+Date: Mon, 21 Oct 2019 16:51:24 -0400
+Subject: [PATCH 10/16] net: dsa: use ports list to setup default CPU port
+
+Use the new ports list instead of iterating over switches and their
+ports when setting up the default CPU port. Unassign it on teardown.
+
+Now that we can iterate over multiple CPU ports, remove dst->cpu_dp.
+
+At the same time, provide a better error message for CPU-less tree.
+
+Signed-off-by: Vivien Didelot <vivien.didelot@gmail.com>
+Reviewed-by: Florian Fainelli <f.fainelli@gmail.com>
+Signed-off-by: Jakub Kicinski <jakub.kicinski@netronome.com>
+---
+ include/net/dsa.h |  5 -----
+ net/dsa/dsa2.c    | 33 ++++++++++++---------------------
+ 2 files changed, 12 insertions(+), 26 deletions(-)
+
+diff --git a/include/net/dsa.h b/include/net/dsa.h
+index bd08bdee8341..f572134eb5de 100644
+--- a/include/net/dsa.h
++++ b/include/net/dsa.h
+@@ -120,11 +120,6 @@ struct dsa_switch_tree {
+ 	 */
+ 	struct dsa_platform_data	*pd;
+ 
+-	/*
+-	 * The switch port to which the CPU is attached.
+-	 */
+-	struct dsa_port		*cpu_dp;
+-
+ 	/* List of switch ports */
+ 	struct list_head ports;
+ 
+diff --git a/net/dsa/dsa2.c b/net/dsa/dsa2.c
+index 80191c7702a9..bf8b4e0fcb4f 100644
+--- a/net/dsa/dsa2.c
++++ b/net/dsa/dsa2.c
+@@ -197,38 +197,29 @@ static struct dsa_port *dsa_tree_find_first_cpu(struct dsa_switch_tree *dst)
+ 
+ static int dsa_tree_setup_default_cpu(struct dsa_switch_tree *dst)
+ {
+-	struct dsa_switch *ds;
+-	struct dsa_port *dp;
+-	int device, port;
++	struct dsa_port *cpu_dp, *dp;
+ 
+-	/* DSA currently only supports a single CPU port */
+-	dst->cpu_dp = dsa_tree_find_first_cpu(dst);
+-	if (!dst->cpu_dp) {
+-		pr_warn("Tree has no master device\n");
++	cpu_dp = dsa_tree_find_first_cpu(dst);
++	if (!cpu_dp) {
++		pr_err("DSA: tree %d has no CPU port\n", dst->index);
+ 		return -EINVAL;
+ 	}
+ 
+ 	/* Assign the default CPU port to all ports of the fabric */
+-	for (device = 0; device < DSA_MAX_SWITCHES; device++) {
+-		ds = dst->ds[device];
+-		if (!ds)
+-			continue;
+-
+-		for (port = 0; port < ds->num_ports; port++) {
+-			dp = &ds->ports[port];
+-
+-			if (dsa_port_is_user(dp) || dsa_port_is_dsa(dp))
+-				dp->cpu_dp = dst->cpu_dp;
+-		}
+-	}
++	list_for_each_entry(dp, &dst->ports, list)
++		if (dsa_port_is_user(dp) || dsa_port_is_dsa(dp))
++			dp->cpu_dp = cpu_dp;
+ 
+ 	return 0;
+ }
+ 
+ static void dsa_tree_teardown_default_cpu(struct dsa_switch_tree *dst)
+ {
+-	/* DSA currently only supports a single CPU port */
+-	dst->cpu_dp = NULL;
++	struct dsa_port *dp;
++
++	list_for_each_entry(dp, &dst->ports, list)
++		if (dsa_port_is_user(dp) || dsa_port_is_dsa(dp))
++			dp->cpu_dp = NULL;
+ }
+ 
+ static int dsa_port_setup(struct dsa_port *dp)
+-- 
+2.34.1
+

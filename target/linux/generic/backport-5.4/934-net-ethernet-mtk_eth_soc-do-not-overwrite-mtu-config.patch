@@ -1,0 +1,95 @@
+From b677d6c7a695dad1b02d2e0e428c39b3b344f270 Mon Sep 17 00:00:00 2001
+From: Lorenzo Bianconi <lorenzo@kernel.org>
+Date: Thu, 17 Nov 2022 00:35:04 +0100
+Subject: [PATCH] net: ethernet: mtk_eth_soc: do not overwrite mtu
+ configuration running reset routine
+
+Restore user configured MTU running mtk_hw_init() during tx timeout routine
+since it will be overwritten after a hw reset.
+
+Reported-by: Felix Fietkau <nbd@nbd.name>
+Fixes: 9ea4d311509f ("net: ethernet: mediatek: add the whole ethernet reset into the reset process")
+Signed-off-by: Lorenzo Bianconi <lorenzo@kernel.org>
+Signed-off-by: David S. Miller <davem@davemloft.net>
+---
+ drivers/net/ethernet/mediatek/mtk_eth_soc.c | 53 +++++++++++++--------
+ 1 file changed, 34 insertions(+), 19 deletions(-)
+
+--- a/drivers/net/ethernet/mediatek/mtk_eth_soc.c
++++ b/drivers/net/ethernet/mediatek/mtk_eth_soc.c
+@@ -2407,6 +2407,30 @@ err_disable_clks:
+ 	return ret;
+ }
+ 
++static void mtk_set_mcr_max_rx(struct mtk_mac *mac, u32 val)
++{
++	struct mtk_eth *eth = mac->hw;
++	u32 mcr_cur, mcr_new;
++
++	if (MTK_HAS_CAPS(eth->soc->caps, MTK_SOC_MT7628))
++		return;
++
++	mcr_cur = mtk_r32(mac->hw, MTK_MAC_MCR(mac->id));
++	mcr_new = mcr_cur & ~MAC_MCR_MAX_RX_MASK;
++
++	if (val <= 1518)
++		mcr_new |= MAC_MCR_MAX_RX(MAC_MCR_MAX_RX_1518);
++	else if (val <= 1536)
++		mcr_new |= MAC_MCR_MAX_RX(MAC_MCR_MAX_RX_1536);
++	else if (val <= 1552)
++		mcr_new |= MAC_MCR_MAX_RX(MAC_MCR_MAX_RX_1552);
++	else
++		mcr_new |= MAC_MCR_MAX_RX(MAC_MCR_MAX_RX_2048);
++
++	if (mcr_new != mcr_cur)
++		mtk_w32(mac->hw, mcr_new, MTK_MAC_MCR(mac->id));
++}
++
+ static int mtk_hw_init(struct mtk_eth *eth)
+ {
+ 	int i, val, ret;
+@@ -2457,8 +2481,16 @@ static int mtk_hw_init(struct mtk_eth *e
+ 	 * up with the more appropriate value when mtk_mac_config call is being
+ 	 * invoked.
+ 	 */
+-	for (i = 0; i < MTK_MAC_COUNT; i++)
++	for (i = 0; i < MTK_MAC_COUNT; i++) {
++		struct net_device *dev = eth->netdev[i];
++
+ 		mtk_w32(eth, MAC_MCR_FORCE_LINK_DOWN, MTK_MAC_MCR(i));
++		if (dev) {
++			struct mtk_mac *mac = netdev_priv(dev);
++
++			mtk_set_mcr_max_rx(mac, dev->mtu + MTK_RX_ETH_HLEN);
++		}
++	}
+ 
+ 	/* Indicates CDM to parse the MTK special tag from CPU
+ 	 * which also is working out for untag packets.
+@@ -2541,25 +2573,8 @@ static int mtk_change_mtu(struct net_dev
+ 	int length = new_mtu + MTK_RX_ETH_HLEN;
+ 	struct mtk_mac *mac = netdev_priv(dev);
+ 	struct mtk_eth *eth = mac->hw;
+-	u32 mcr_cur, mcr_new;
+-
+-	if (!MTK_HAS_CAPS(eth->soc->caps, MTK_SOC_MT7628)) {
+-		mcr_cur = mtk_r32(mac->hw, MTK_MAC_MCR(mac->id));
+-		mcr_new = mcr_cur & ~MAC_MCR_MAX_RX_MASK;
+-
+-		if (length <= 1518)
+-			mcr_new |= MAC_MCR_MAX_RX(MAC_MCR_MAX_RX_1518);
+-		else if (length <= 1536)
+-			mcr_new |= MAC_MCR_MAX_RX(MAC_MCR_MAX_RX_1536);
+-		else if (length <= 1552)
+-			mcr_new |= MAC_MCR_MAX_RX(MAC_MCR_MAX_RX_1552);
+-		else
+-			mcr_new |= MAC_MCR_MAX_RX(MAC_MCR_MAX_RX_2048);
+-
+-		if (mcr_new != mcr_cur)
+-			mtk_w32(mac->hw, mcr_new, MTK_MAC_MCR(mac->id));
+-	}
+ 
++	mtk_set_mcr_max_rx(mac, length);
+ 	dev->mtu = new_mtu;
+ 
+ 	return 0;

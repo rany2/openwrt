@@ -1,0 +1,45 @@
+From 86bfb2c1f4337d3306d235f615d35ba8bbbe4650 Mon Sep 17 00:00:00 2001
+From: Vivien Didelot <vivien.didelot@gmail.com>
+Date: Mon, 21 Oct 2019 16:51:20 -0400
+Subject: [PATCH 06/16] net: dsa: use ports list for routing table setup
+
+Use the new ports list instead of accessing the dsa_switch array
+of ports when iterating over DSA ports of a switch to set up the
+routing table.
+
+Signed-off-by: Vivien Didelot <vivien.didelot@gmail.com>
+Reviewed-by: Florian Fainelli <f.fainelli@gmail.com>
+Reviewed-by: Andrew Lunn <andrew@lunn.ch>
+Signed-off-by: Jakub Kicinski <jakub.kicinski@netronome.com>
+---
+ net/dsa/dsa2.c | 7 +++----
+ 1 file changed, 3 insertions(+), 4 deletions(-)
+
+diff --git a/net/dsa/dsa2.c b/net/dsa/dsa2.c
+index 01b6047d9b7b..623805ba8e1a 100644
+--- a/net/dsa/dsa2.c
++++ b/net/dsa/dsa2.c
+@@ -157,6 +157,7 @@ static bool dsa_port_setup_routing_table(struct dsa_port *dp)
+ 
+ static bool dsa_switch_setup_routing_table(struct dsa_switch *ds)
+ {
++	struct dsa_switch_tree *dst = ds->dst;
+ 	bool complete = true;
+ 	struct dsa_port *dp;
+ 	int i;
+@@ -164,10 +165,8 @@ static bool dsa_switch_setup_routing_table(struct dsa_switch *ds)
+ 	for (i = 0; i < DSA_MAX_SWITCHES; i++)
+ 		ds->rtable[i] = DSA_RTABLE_NONE;
+ 
+-	for (i = 0; i < ds->num_ports; i++) {
+-		dp = &ds->ports[i];
+-
+-		if (dsa_port_is_dsa(dp)) {
++	list_for_each_entry(dp, &dst->ports, list) {
++		if (dp->ds == ds && dsa_port_is_dsa(dp)) {
+ 			complete = dsa_port_setup_routing_table(dp);
+ 			if (!complete)
+ 				break;
+-- 
+2.34.1
+

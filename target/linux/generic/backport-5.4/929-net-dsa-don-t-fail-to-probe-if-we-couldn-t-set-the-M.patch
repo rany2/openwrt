@@ -1,0 +1,42 @@
+From 72579e14a1d3d3d561039dfe7e5f47aaf22e3fd3 Mon Sep 17 00:00:00 2001
+From: Vladimir Oltean <vladimir.oltean@nxp.com>
+Date: Tue, 21 Apr 2020 20:18:53 +0300
+Subject: [PATCH] net: dsa: don't fail to probe if we couldn't set the MTU
+
+There is no reason to fail the probing of the switch if the MTU couldn't
+be configured correctly (either the switch port itself, or the host
+port) for whatever reason. MTU-sized traffic probably won't work, sure,
+but we can still probably limp on and support some form of communication
+anyway, which the users would probably appreciate more.
+
+Fixes: bfcb813203e6 ("net: dsa: configure the MTU for switch ports")
+Reported-by: Oleksij Rempel <o.rempel@pengutronix.de>
+Signed-off-by: Vladimir Oltean <vladimir.oltean@nxp.com>
+Reviewed-by: Florian Fainelli <f.fainelli@gmail.com>
+Signed-off-by: David S. Miller <davem@davemloft.net>
+---
+ net/dsa/slave.c | 8 +++-----
+ 1 file changed, 3 insertions(+), 5 deletions(-)
+
+diff --git a/net/dsa/slave.c b/net/dsa/slave.c
+index e94eb1aac602..d1068803cd11 100644
+--- a/net/dsa/slave.c
++++ b/net/dsa/slave.c
+@@ -1770,11 +1770,9 @@ int dsa_slave_create(struct dsa_port *port)
+ 	rtnl_lock();
+ 	ret = dsa_slave_change_mtu(slave_dev, ETH_DATA_LEN);
+ 	rtnl_unlock();
+-	if (ret && ret != -EOPNOTSUPP) {
+-		dev_err(ds->dev, "error %d setting MTU on port %d\n",
+-			ret, port->index);
+-		goto out_free;
+-	}
++	if (ret)
++		dev_warn(ds->dev, "nonfatal error %d setting MTU on port %d\n",
++			 ret, port->index);
+ 
+ 	netif_carrier_off(slave_dev);
+ 
+-- 
+2.34.1
+

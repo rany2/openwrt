@@ -38,7 +38,7 @@ Signed-off-by: Felix Fietkau <nbd@nbd.name>
  
  #include "dsa_priv.h"
  
-@@ -1224,6 +1228,27 @@ static struct devlink_port *dsa_slave_ge
+@@ -1314,6 +1318,27 @@ static struct devlink_port *dsa_slave_ge
  	return dp->ds->devlink ? &dp->devlink_port : NULL;
  }
  
@@ -66,10 +66,10 @@ Signed-off-by: Felix Fietkau <nbd@nbd.name>
  static const struct net_device_ops dsa_slave_netdev_ops = {
  	.ndo_open	 	= dsa_slave_open,
  	.ndo_stop		= dsa_slave_close,
-@@ -1248,6 +1273,9 @@ static const struct net_device_ops dsa_s
- 	.ndo_vlan_rx_add_vid	= dsa_slave_vlan_rx_add_vid,
+@@ -1339,6 +1364,9 @@ static const struct net_device_ops dsa_s
  	.ndo_vlan_rx_kill_vid	= dsa_slave_vlan_rx_kill_vid,
  	.ndo_get_devlink_port	= dsa_slave_get_devlink_port,
+ 	.ndo_change_mtu		= dsa_slave_change_mtu,
 +#if IS_ENABLED(CONFIG_NF_FLOW_TABLE)
 +	.ndo_flow_offload_check	 = dsa_flow_offload_check,
 +#endif

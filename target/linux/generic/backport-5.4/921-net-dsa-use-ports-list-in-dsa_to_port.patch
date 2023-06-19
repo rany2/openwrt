@@ -1,0 +1,39 @@
+From b96ddf254b09447c6b79632cdc02dae3f2454a82 Mon Sep 17 00:00:00 2001
+From: Vivien Didelot <vivien.didelot@gmail.com>
+Date: Mon, 21 Oct 2019 16:51:17 -0400
+Subject: [PATCH 03/16] net: dsa: use ports list in dsa_to_port
+
+Use the new ports list instead of accessing the dsa_switch array
+of ports in the dsa_to_port helper.
+
+Signed-off-by: Vivien Didelot <vivien.didelot@gmail.com>
+Reviewed-by: Florian Fainelli <f.fainelli@gmail.com>
+Reviewed-by: Andrew Lunn <andrew@lunn.ch>
+Signed-off-by: Jakub Kicinski <jakub.kicinski@netronome.com>
+---
+ include/net/dsa.h | 9 ++++++++-
+ 1 file changed, 8 insertions(+), 1 deletion(-)
+
+diff --git a/include/net/dsa.h b/include/net/dsa.h
+index 6ff6dfcdc61d..d2b7ee28f3fd 100644
+--- a/include/net/dsa.h
++++ b/include/net/dsa.h
+@@ -285,7 +285,14 @@ struct dsa_switch {
+ 
+ static inline struct dsa_port *dsa_to_port(struct dsa_switch *ds, int p)
+ {
+-	return &ds->ports[p];
++	struct dsa_switch_tree *dst = ds->dst;
++	struct dsa_port *dp = NULL;
++
++	list_for_each_entry(dp, &dst->ports, list)
++		if (dp->ds == ds && dp->index == p)
++			break;
++
++	return dp;
+ }
+ 
+ static inline bool dsa_is_unused_port(struct dsa_switch *ds, int p)
+-- 
+2.34.1
+
