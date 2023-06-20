@@ -1,0 +1,79 @@
+--- a/include/net/mac80211.h
++++ b/include/net/mac80211.h
+@@ -4554,11 +4554,13 @@ struct ieee80211_ops {
+ 				     struct ieee80211_sta *sta, u8 flowid);
+ 	int (*set_radar_background)(struct ieee80211_hw *hw,
+ 				    struct cfg80211_chan_def *chandef);
++#if LINUX_VERSION_IS_GEQ(5,10,0)
+ 	int (*net_fill_forward_path)(struct ieee80211_hw *hw,
+ 				     struct ieee80211_vif *vif,
+ 				     struct ieee80211_sta *sta,
+ 				     struct net_device_path_ctx *ctx,
+ 				     struct net_device_path *path);
++#endif
+ 	int (*change_vif_links)(struct ieee80211_hw *hw,
+ 				struct ieee80211_vif *vif,
+ 				u16 old_links, u16 new_links,
+--- a/net/mac80211/driver-ops.h
++++ b/net/mac80211/driver-ops.h
+@@ -1465,6 +1465,7 @@ static inline void drv_twt_teardown_requ
+ 	trace_drv_return_void(local);
+ }
+ 
++#if LINUX_VERSION_IS_GEQ(5,10,0)
+ static inline int drv_net_fill_forward_path(struct ieee80211_local *local,
+ 					    struct ieee80211_sub_if_data *sdata,
+ 					    struct ieee80211_sta *sta,
+@@ -1486,6 +1487,7 @@ static inline int drv_net_fill_forward_p
+ 
+ 	return ret;
+ }
++#endif
+ 
+ static inline int drv_net_setup_tc(struct ieee80211_local *local,
+ 				   struct ieee80211_sub_if_data *sdata,
+--- a/net/mac80211/iface.c
++++ b/net/mac80211/iface.c
+@@ -878,6 +878,7 @@ static const struct net_device_ops ieee8
+ 	.ndo_get_stats64	= ieee80211_get_stats64,
+ };
+ 
++#if LINUX_VERSION_IS_GEQ(5,10,0)
+ static int ieee80211_netdev_fill_forward_path(struct net_device_path_ctx *ctx,
+ 					      struct net_device_path *path)
+ {
+@@ -935,6 +936,7 @@ out:
+ 
+ 	return ret;
+ }
++#endif
+ 
+ static const struct net_device_ops ieee80211_dataif_8023_ops = {
+ 	.ndo_open		= ieee80211_open,
+@@ -944,7 +946,9 @@ static const struct net_device_ops ieee8
+ 	.ndo_set_rx_mode	= ieee80211_set_multicast_list,
+ 	.ndo_set_mac_address	= ieee80211_change_mac,
+ 	.ndo_get_stats64	= ieee80211_get_stats64,
++#if LINUX_VERSION_IS_GEQ(5,10,0)
+ 	.ndo_fill_forward_path	= ieee80211_netdev_fill_forward_path,
++#endif
+ 	.ndo_setup_tc		= ieee80211_netdev_setup_tc,
+ };
+ 
+--- a/net/mac80211/trace.h
++++ b/net/mac80211/trace.h
+@@ -2478,12 +2478,14 @@ TRACE_EVENT(drv_twt_teardown_request,
+ 	)
+ );
+ 
++#if LINUX_VERSION_IS_GEQ(5,10,0)
+ DEFINE_EVENT(sta_event, drv_net_fill_forward_path,
+ 	TP_PROTO(struct ieee80211_local *local,
+ 		 struct ieee80211_sub_if_data *sdata,
+ 		 struct ieee80211_sta *sta),
+ 	TP_ARGS(local, sdata, sta)
+ );
++#endif
+ 
+ TRACE_EVENT(drv_net_setup_tc,
+ 	TP_PROTO(struct ieee80211_local *local,
