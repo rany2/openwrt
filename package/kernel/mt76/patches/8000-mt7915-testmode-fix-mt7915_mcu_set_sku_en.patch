@@ -1,0 +1,28 @@
+--- a/mt7915/testmode.c
++++ b/mt7915/testmode.c
+@@ -1695,9 +1695,11 @@ mt7915_tm_init(struct mt7915_phy *phy, b
+ 	if (!test_bit(MT76_STATE_RUNNING, &phy->mt76->state))
+ 		return;
+ 
++#if 0
+ 	phy->sku_limit_en = !en;
+ 	phy->sku_path_en = !en;
+-	mt7915_mcu_set_sku_en(phy);
++#endif
++	mt7915_mcu_set_sku_en(phy, !en);
+ 
+ 	mt7915_tm_mode_ctrl(dev, en);
+ 	mt7915_tm_reg_backup_restore(phy);
+@@ -2451,9 +2453,11 @@ mt7915_tm_update_params(struct mt7915_ph
+ 	if (changed & BIT(TM_CHANGED_TXPOWER))
+ 		mt7915_tm_set_tx_power(phy);
+ 	if (changed & BIT(TM_CHANGED_SKU_EN)) {
++#if 0
+ 		phy->sku_limit_en = td->sku_en;
+ 		phy->sku_path_en = td->sku_en;
+-		mt7915_mcu_set_sku_en(phy);
++#endif
++		mt7915_mcu_set_sku_en(phy, td->sku_en);
+ 		mt7915_mcu_set_txpower_sku(phy);
+ 	}
+ 	if (changed & BIT(TM_CHANGED_AID))
