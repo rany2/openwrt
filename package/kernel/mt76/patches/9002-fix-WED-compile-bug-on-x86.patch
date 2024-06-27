@@ -1,0 +1,28 @@
+--- a/mt7915/mcu.c
++++ b/mt7915/mcu.c
+@@ -2593,10 +2593,12 @@ int mt7915_mcu_init_firmware(struct mt79
+ 		    !mtk_wed_get_rx_capa(&dev->mt76.mmio.wed))
+ 			ret = mt7915_mcu_wa_cmd(dev, MCU_WA_PARAM_CMD(CAPABILITY),
+ 						0, 0, 0);
++#ifdef CONFIG_NET_MEDIATEK_SOC_WED
+ 		else
+ 			ret = mt7915_mcu_wa_cmd(dev, MCU_WA_PARAM_CMD(SET),
+ 						MCU_WA_PARAM_WED_VERSION,
+ 						dev->mt76.mmio.wed.rev_id, 0);
++#endif
+ 		if (ret)
+ 			return ret;
+ 	}
+--- a/tx.c
++++ b/tx.c
+@@ -838,8 +838,10 @@ int mt76_token_consume(struct mt76_dev *
+ 		return -EINVAL;
+ 	}
+ 
++#ifdef CONFIG_NET_MEDIATEK_SOC_WED
+ 	if (mtk_wed_device_active(&dev->mmio.wed))
+ 		start = dev->mmio.wed.wlan.nbuf;
++#endif
+ 
+ 	token = idr_alloc(&dev->token, *ptxwi, start, start + dev->token_size,
+ 			  GFP_ATOMIC);
