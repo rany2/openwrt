@@ -47,7 +47,7 @@ Signed-off-by: Benjamin Lin <benjamin-jw.lin@mediatek.com>
 +				  struct ieee80211_sub_if_data *sdata,
 +				  struct cfg80211_qos_map *qos_map)
 +{
-+	int ret = -EOPNOTSUPP;
++	int ret = 0;
 +
 +	might_sleep();
 +
