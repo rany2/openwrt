@@ -1,0 +1,20 @@
+From 90241462ed9e80080203f2231c753434b6d86469 Mon Sep 17 00:00:00 2001
+From: Ritaro Takenaka <ritarot634@gmail.com>
+Date: Mon, 3 Jan 2022 16:47:00 +0900
+Subject: [PATCH] disable pre calib
+
+---
+ mt7615/eeprom.c | 2 ++
+ 1 file changed, 2 insertions(+)
+
+--- a/mt7615/eeprom.c
++++ b/mt7615/eeprom.c
+@@ -340,6 +340,8 @@ int mt7615_eeprom_init(struct mt7615_dev
+ 	} else {
+ 		dev->flash_eeprom = true;
+ 		mt7615_cal_free_data(dev);
++		((u8 *)dev->mt76.eeprom.data)[MT_EE_CALDATA_FLASH] &= ~GENMASK(4, 0);
++		dev_info(dev->mt76.dev, "enabling online calibration");
+ 	}
+ 
+ 	mt7615_eeprom_parse_hw_cap(dev);
