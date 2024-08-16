@@ -1,0 +1,10 @@
+--- a/iwinfo_lib.c
++++ b/iwinfo_lib.c
+@@ -378,6 +378,7 @@ const struct iwinfo_iso3166_label IWINFO
+ 	{ 0x5A41 /* ZA */, "South Africa" },
+ 	{ 0x5A4D /* ZM */, "Zambia" },
+ 	{ 0x5A57 /* ZW */, "Zimbabwe" },
++	{ 0x5A5A /* ZZ */, "ZZ" },
+ 	{ 0,               "" }
+ };
+ 
