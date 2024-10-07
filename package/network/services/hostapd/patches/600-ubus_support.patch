@@ -116,7 +116,7 @@ probe/assoc/auth requests via object subscribe.
  #ifdef CONFIG_P2P
  	if (elems.p2p) {
  		wpabuf_free(sta->p2p_ie);
-@@ -1369,6 +1379,7 @@ void hostapd_event_ch_switch(struct host
+@@ -1376,6 +1386,7 @@ void hostapd_event_ch_switch(struct host
  
  		wpa_msg(hapd->msg_ctx, MSG_INFO, AP_CSA_FINISHED
  			"freq=%d dfs=%d", freq, is_dfs);
@@ -195,7 +195,7 @@ probe/assoc/auth requests via object subscribe.
  struct hostapd_iface * hostapd_alloc_iface(void);
 --- a/src/ap/ieee802_11.c
 +++ b/src/ap/ieee802_11.c
-@@ -2897,7 +2897,7 @@ static void handle_auth(struct hostapd_d
+@@ -2904,7 +2904,7 @@ static void handle_auth(struct hostapd_d
  	u16 auth_alg, auth_transaction, status_code;
  	u16 resp = WLAN_STATUS_SUCCESS;
  	struct sta_info *sta = NULL;
@@ -204,7 +204,7 @@ probe/assoc/auth requests via object subscribe.
  	u16 fc;
  	const u8 *challenge = NULL;
  	u8 resp_ies[2 + WLAN_AUTH_CHALLENGE_LEN];
-@@ -2908,6 +2908,11 @@ static void handle_auth(struct hostapd_d
+@@ -2915,6 +2915,11 @@ static void handle_auth(struct hostapd_d
  #ifdef CONFIG_IEEE80211BE
  	bool mld_sta = false;
  #endif /* CONFIG_IEEE80211BE */
@@ -216,7 +216,7 @@ probe/assoc/auth requests via object subscribe.
  
  	if (len < IEEE80211_HDRLEN + sizeof(mgmt->u.auth)) {
  		wpa_printf(MSG_INFO, "handle_auth - too short payload (len=%lu)",
-@@ -3104,6 +3109,13 @@ static void handle_auth(struct hostapd_d
+@@ -3111,6 +3116,13 @@ static void handle_auth(struct hostapd_d
  		resp = WLAN_STATUS_UNSPECIFIED_FAILURE;
  		goto fail;
  	}
@@ -230,7 +230,7 @@ probe/assoc/auth requests via object subscribe.
  	if (res == HOSTAPD_ACL_PENDING)
  		return;
  
-@@ -5367,7 +5379,7 @@ static void handle_assoc(struct hostapd_
+@@ -5373,7 +5385,7 @@ static void handle_assoc(struct hostapd_
  	int resp = WLAN_STATUS_SUCCESS;
  	u16 reply_res = WLAN_STATUS_UNSPECIFIED_FAILURE;
  	const u8 *pos;
@@ -239,7 +239,7 @@ probe/assoc/auth requests via object subscribe.
  	struct sta_info *sta;
  	u8 *tmp = NULL;
  #ifdef CONFIG_FILS
-@@ -5609,6 +5621,11 @@ static void handle_assoc(struct hostapd_
+@@ -5615,6 +5627,11 @@ static void handle_assoc(struct hostapd_
  		left = res;
  	}
  #endif /* CONFIG_FILS */
@@ -251,7 +251,7 @@ probe/assoc/auth requests via object subscribe.
  
  	/* followed by SSID and Supported rates; and HT capabilities if 802.11n
  	 * is used */
-@@ -5711,6 +5728,13 @@ static void handle_assoc(struct hostapd_
+@@ -5717,6 +5734,13 @@ static void handle_assoc(struct hostapd_
  	if (set_beacon)
  		ieee802_11_update_beacons(hapd->iface);
  
@@ -265,7 +265,7 @@ probe/assoc/auth requests via object subscribe.
   fail:
  
  	/*
-@@ -5940,6 +5964,7 @@ static void handle_disassoc(struct hosta
+@@ -5946,6 +5970,7 @@ static void handle_disassoc(struct hosta
  			   (unsigned long) len);
  		return;
  	}
@@ -273,7 +273,7 @@ probe/assoc/auth requests via object subscribe.
  
  	sta = ap_get_sta(hapd, mgmt->sa);
  	if (!sta) {
-@@ -5971,6 +5996,8 @@ static void handle_deauth(struct hostapd
+@@ -5977,6 +6002,8 @@ static void handle_deauth(struct hostapd
  	/* Clear the PTKSA cache entries for PASN */
  	ptksa_cache_flush(hapd->ptksa, mgmt->sa, WPA_CIPHER_NONE);
  
@@ -683,7 +683,7 @@ probe/assoc/auth requests via object subscribe.
  			break;
 --- a/wpa_supplicant/wpa_supplicant.c
 +++ b/wpa_supplicant/wpa_supplicant.c
-@@ -7920,6 +7920,8 @@ struct wpa_supplicant * wpa_supplicant_a
+@@ -7952,6 +7952,8 @@ struct wpa_supplicant * wpa_supplicant_a
  	}
  #endif /* CONFIG_P2P */
  
@@ -692,7 +692,7 @@ probe/assoc/auth requests via object subscribe.
  	return wpa_s;
  }
  
-@@ -7946,6 +7948,8 @@ int wpa_supplicant_remove_iface(struct w
+@@ -7978,6 +7980,8 @@ int wpa_supplicant_remove_iface(struct w
  	struct wpa_supplicant *parent = wpa_s->parent;
  #endif /* CONFIG_MESH */
  
@@ -701,7 +701,7 @@ probe/assoc/auth requests via object subscribe.
  	/* Remove interface from the global list of interfaces */
  	prev = global->ifaces;
  	if (prev == wpa_s) {
-@@ -8292,8 +8296,12 @@ int wpa_supplicant_run(struct wpa_global
+@@ -8324,8 +8328,12 @@ int wpa_supplicant_run(struct wpa_global
  	eloop_register_signal_terminate(wpa_supplicant_terminate, global);
  	eloop_register_signal_reconfig(wpa_supplicant_reconfig, global);
  
