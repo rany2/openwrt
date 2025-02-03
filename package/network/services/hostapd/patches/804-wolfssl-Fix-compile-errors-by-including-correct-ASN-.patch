@@ -1,0 +1,28 @@
+From 1b698d77a2be5d54d664563f73c3e4165adda377 Mon Sep 17 00:00:00 2001
+From: Rany Hany <rany_hany@riseup.net>
+Date: Mon, 3 Feb 2025 20:43:22 +0200
+Subject: [PATCH] wolfssl: Fix compile errors by including correct ASN header
+
+wolfssl/wolfcrypt/asn_public.h does not declare NO_VERIFY and
+RSAk which results in undeclared identifier errors.
+
+These symbols are defined in wolfssl/wolfcrypt/asn.h so we
+include that instead. This might not be ideal as
+wolfssl/wolfcrypt/asn.h is the private header.
+
+Signed-off-by: Rany Hany <rany_hany@riseup.net>
+---
+ src/crypto/crypto_wolfssl.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+--- a/src/crypto/crypto_wolfssl.c
++++ b/src/crypto/crypto_wolfssl.c
+@@ -18,7 +18,7 @@
+ #include <wolfssl/openssl/bn.h>
+ #include <wolfssl/wolfcrypt/aes.h>
+ #include <wolfssl/wolfcrypt/arc4.h>
+-#include <wolfssl/wolfcrypt/asn_public.h>
++#include <wolfssl/wolfcrypt/asn.h>
+ #include <wolfssl/wolfcrypt/cmac.h>
+ #include <wolfssl/wolfcrypt/des3.h>
+ #include <wolfssl/wolfcrypt/dh.h>
