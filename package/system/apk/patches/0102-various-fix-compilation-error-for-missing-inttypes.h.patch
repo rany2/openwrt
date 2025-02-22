@@ -1,0 +1,22 @@
+From 8abae4785c78f2af78824a50d107396857137da8 Mon Sep 17 00:00:00 2001
+From: Christian Marangi <ansuelsmth@gmail.com>
+Date: Mon, 3 Feb 2025 22:09:25 +0100
+Subject: [PATCH] various: fix compilation error for missing inttypes.h
+
+Fix compilation error for missing inttypes.h header due to PRIu64 usage.
+
+Signed-off-by: Christian Marangi <ansuelsmth@gmail.com>
+---
+ src/apk_defines.h | 1 +
+ 1 file changed, 1 insertion(+)
+
+--- a/src/apk_defines.h
++++ b/src/apk_defines.h
+@@ -12,6 +12,7 @@
+ 
+ #include <assert.h>
+ #include <endian.h>
++#include <inttypes.h>
+ #include <stdint.h>
+ #include <stddef.h>
+ #include <stdbool.h>
