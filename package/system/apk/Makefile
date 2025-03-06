@@ -1,13 +1,13 @@
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=apk
-PKG_RELEASE:=2
+PKG_RELEASE:=1
 
 PKG_SOURCE_URL=https://gitlab.alpinelinux.org/alpine/apk-tools.git
 PKG_SOURCE_PROTO:=git
-PKG_SOURCE_DATE:=2025-02-08
-PKG_SOURCE_VERSION:=34771ccb7964b0e7cb5d1fc64bd1b83fe73296ba
-PKG_MIRROR_HASH:=fddd0334fa2ce7cc7fedb2cc95ee800caf9cbe43d617c2e612e2f58fc30b14c2
+PKG_SOURCE_DATE:=2024-12-18
+PKG_SOURCE_VERSION:=e1275e2f5010c1f8d7c96326061c4551e88b3b83
+PKG_MIRROR_HASH:=4b75bd56859b1a91765894d6d63df1f953096410e211e5312c8b657c774a8f43
 
 PKG_VERSION=3.0.0_pre$(subst -,,$(PKG_SOURCE_DATE))
 
@@ -61,7 +61,6 @@ MESON_COMMON_ARGS = \
 	-Ddefault_library=static \
 	-Durl_backend=wget \
 	-Dzstd=false \
-	-Dpython=disabled \
 	-Dtests=disabled
 
 MESON_HOST_ARGS += \
