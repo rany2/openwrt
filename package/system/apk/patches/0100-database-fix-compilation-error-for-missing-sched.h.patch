@@ -1,0 +1,23 @@
+From 89ef2b546087bb60fa74ba47a8c05d79ef5d57c8 Mon Sep 17 00:00:00 2001
+From: Christian Marangi <ansuelsmth@gmail.com>
+Date: Sat, 1 Feb 2025 00:51:57 +0100
+Subject: [PATCH] database: fix compilation error for missing sched.h
+
+Fix compilation error for missing sched.h due to unshare and CLONE_NEWNS
+and CLONE_NEWUSER.
+
+Signed-off-by: Christian Marangi <ansuelsmth@gmail.com>
+---
+ src/database.c | 1 +
+ 1 file changed, 1 insertion(+)
+
+--- a/src/database.c
++++ b/src/database.c
+@@ -13,6 +13,7 @@
+ #include <libgen.h>
+ #include <limits.h>
+ #include <unistd.h>
++#include <sched.h>
+ #include <string.h>
+ #include <stdlib.h>
+ #include <signal.h>
