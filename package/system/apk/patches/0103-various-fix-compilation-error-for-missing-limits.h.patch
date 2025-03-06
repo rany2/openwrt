@@ -1,0 +1,33 @@
+From fdb10df214861b2990e3889122736c2a41359e37 Mon Sep 17 00:00:00 2001
+From: Christian Marangi <ansuelsmth@gmail.com>
+Date: Sat, 1 Feb 2025 00:50:29 +0100
+Subject: [PATCH] various: fix compilation error for missing limits.h
+
+Fix compilation error for missing limits.h due to PATH_MAX.
+
+Signed-off-by: Christian Marangi <ansuelsmth@gmail.com>
+---
+ src/app_mkndx.c | 1 +
+ src/print.c     | 1 +
+ 2 files changed, 2 insertions(+)
+
+--- a/src/app_mkndx.c
++++ b/src/app_mkndx.c
+@@ -13,6 +13,7 @@
+ #include <stdio.h>
+ #include <fcntl.h>
+ #include <unistd.h>
++#include <limits.h>
+ #include <sys/stat.h>
+ 
+ #include "apk_adb.h"
+--- a/src/print.c
++++ b/src/print.c
+@@ -7,6 +7,7 @@
+  * SPDX-License-Identifier: GPL-2.0-only
+  */
+ 
++#include <limits.h>
+ #include <stdio.h>
+ #include <stdarg.h>
+ #include <stdlib.h>
