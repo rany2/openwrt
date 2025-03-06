@@ -1,0 +1,22 @@
+From 025710552ac831d373288f31974ad4c3d76504d6 Mon Sep 17 00:00:00 2001
+From: Christian Marangi <ansuelsmth@gmail.com>
+Date: Sat, 1 Feb 2025 22:44:46 +0100
+Subject: [PATCH] io: fix compilation error for missing stdarg.h
+
+Fix compilation error for missing stdarg.h due to va_start and va_end.
+
+Signed-off-by: Christian Marangi <ansuelsmth@gmail.com>
+---
+ src/io.c | 1 +
+ 1 file changed, 1 insertion(+)
+
+--- a/src/io.c
++++ b/src/io.c
+@@ -13,6 +13,7 @@
+ #include <endian.h>
+ #include <unistd.h>
+ #include <dirent.h>
++#include <stdarg.h>
+ #include <stdint.h>
+ #include <sys/mman.h>
+ #include <sys/wait.h>
