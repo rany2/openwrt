@@ -1,0 +1,68 @@
+From b7f9ba471c8dddd1da4503731592c39756d9444e Mon Sep 17 00:00:00 2001
+From: Rany Hany <rany_hany@riseup.net>
+Date: Fri, 11 Apr 2025 03:30:00 +0000
+Subject: [PATCH 3/3] Revert "wifi: mac80211: call rate_control_rate_update()
+ for link STA"
+
+This reverts commit 7757e7c140f7250cb1f62000421c6d788372f7b7.
+
+Signed-off-by: Rany Hany <rany_hany@riseup.net>
+---
+ mt7915/main.c | 5 ++---
+ mt7996/main.c | 5 ++---
+ 2 files changed, 4 insertions(+), 6 deletions(-)
+
+diff --git a/mt7915/main.c b/mt7915/main.c
+index 3aa31c5c..58e0a85f 100644
+--- a/mt7915/main.c
++++ b/mt7915/main.c
+@@ -1224,10 +1224,9 @@ static void mt7915_sta_rc_work(void *data, struct ieee80211_sta *sta)
+ 
+ static void mt7915_sta_rc_update(struct ieee80211_hw *hw,
+ 				 struct ieee80211_vif *vif,
+-				 struct ieee80211_link_sta *link_sta,
++				 struct ieee80211_sta *sta,
+ 				 u32 changed)
+ {
+-	struct ieee80211_sta *sta = link_sta->sta;
+ 	struct mt7915_phy *phy = mt7915_hw_phy(hw);
+ 	struct mt7915_dev *dev = phy->dev;
+ 	struct mt7915_sta *msta = (struct mt7915_sta *)sta->drv_priv;
+@@ -1771,7 +1770,7 @@ const struct ieee80211_ops mt7915_ops = {
+ 	.stop_ap = mt7915_stop_ap,
+ 	.sta_state = mt76_sta_state,
+ 	.sta_pre_rcu_remove = mt76_sta_pre_rcu_remove,
+-	.link_sta_rc_update = mt7915_sta_rc_update,
++	.sta_rc_update = mt7915_sta_rc_update,
+ 	.set_key = mt7915_set_key,
+ 	.ampdu_action = mt7915_ampdu_action,
+ 	.set_rts_threshold = mt7915_set_rts_threshold,
+diff --git a/mt7996/main.c b/mt7996/main.c
+index 25ca042b..bc1960f8 100644
+--- a/mt7996/main.c
++++ b/mt7996/main.c
+@@ -1600,11 +1600,10 @@ static void mt7996_sta_rc_work(void *data, struct ieee80211_sta *sta)
+ 
+ static void mt7996_sta_rc_update(struct ieee80211_hw *hw,
+ 				 struct ieee80211_vif *vif,
+-				 struct ieee80211_link_sta *link_sta,
++				 struct ieee80211_sta *sta,
+ 				 u32 changed)
+ {
+ 	struct mt7996_dev *dev = mt7996_hw_dev(hw);
+-	struct ieee80211_sta *sta = link_sta->sta;
+ 
+ 	mt7996_sta_rc_work(&changed, sta);
+ 	ieee80211_queue_work(hw, &dev->rc_work);
+@@ -2096,7 +2095,7 @@ const struct ieee80211_ops mt7996_ops = {
+ 	.link_info_changed = mt7996_link_info_changed,
+ 	.sta_state = mt7996_sta_state,
+ 	.sta_pre_rcu_remove = mt76_sta_pre_rcu_remove,
+-	.link_sta_rc_update = mt7996_sta_rc_update,
++	.sta_rc_update = mt7996_sta_rc_update,
+ 	.set_key = mt7996_set_key,
+ 	.ampdu_action = mt7996_ampdu_action,
+ 	.set_rts_threshold = mt7996_set_rts_threshold,
+-- 
+2.43.5
+
