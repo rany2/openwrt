@@ -1,0 +1,319 @@
+From 731ca594efef5dc616375fdd9e87284adec5354b Mon Sep 17 00:00:00 2001
+From: David Bauer <mail@david-bauer.net>
+Date: Mon, 27 Apr 2026 19:47:13 +0200
+Subject: [PATCH] wifi: mt76: mt7915: receive noisefloor statistics from
+ firmware
+
+Some MT7915 boards report idle power values instead of idle power
+indicator values. These are not retrieved from the current codepath
+reading the undocumented registers.
+
+Instead activate noisefloor notifications from device firmware.
+Calculate noisefllor from IPI or IP values depending on which one are
+available.
+
+Signed-off-by: David Bauer <mail@david-bauer.net>
+---
+ mt76_connac_mcu.h |  2 +
+ mt7915/mac.c      | 51 ------------------------
+ mt7915/main.c     |  5 +--
+ mt7915/mcu.c      | 98 +++++++++++++++++++++++++++++++++++++++++++++++
+ mt7915/mcu.h      | 14 +++++++
+ mt7915/mt7915.h   | 10 ++++-
+ 6 files changed, 125 insertions(+), 55 deletions(-)
+
+--- a/mt76_connac_mcu.h
++++ b/mt76_connac_mcu.h
+@@ -1055,6 +1055,7 @@ enum {
+ 	MCU_EXT_EVENT_BCC_NOTIFY = 0x75,
+ 	MCU_EXT_EVENT_WF_RF_PIN_CTRL = 0x9a,
+ 	MCU_EXT_EVENT_MURU_CTRL = 0x9f,
++	MCU_EXT_EVENT_NOISEFLOOR = 0xb8,
+ };
+ 
+ /* unified event table */
+@@ -1274,6 +1275,7 @@ enum {
+ 	MCU_EXT_CMD_GROUP_PRE_CAL_INFO = 0xab,
+ 	MCU_EXT_CMD_DPD_PRE_CAL_INFO = 0xac,
+ 	MCU_EXT_CMD_PHY_STAT_INFO = 0xad,
++	MCU_EXT_CMD_ENABLE_NOISEFLOOR = 0xb8,
+ 	MCU_EXT_CMD_WF_RF_PIN_CTRL = 0xbd,
+ };
+ 
+--- a/mt7915/mac.c
++++ b/mt7915/mac.c
+@@ -1181,62 +1181,11 @@ void mt7915_mac_set_timing(struct mt7915
+ 		   MT_ARB_SCR_TX_DISABLE | MT_ARB_SCR_RX_DISABLE);
+ }
+ 
+-void mt7915_mac_enable_nf(struct mt7915_dev *dev, bool band)
+-{
+-	u32 reg;
+-
+-	reg = is_mt7915(&dev->mt76) ? MT_WF_PHY_RXTD12(band) :
+-				      MT_WF_PHY_RXTD12_MT7916(band);
+-	mt76_set(dev, reg,
+-		 MT_WF_PHY_RXTD12_IRPI_SW_CLR_ONLY |
+-		 MT_WF_PHY_RXTD12_IRPI_SW_CLR);
+-
+-	reg = is_mt7915(&dev->mt76) ? MT_WF_PHY_RX_CTRL1(band) :
+-				      MT_WF_PHY_RX_CTRL1_MT7916(band);
+-	mt76_set(dev, reg, FIELD_PREP(MT_WF_PHY_RX_CTRL1_IPI_EN, 0x5));
+-}
+-
+-static u8
+-mt7915_phy_get_nf(struct mt7915_phy *phy, int idx)
+-{
+-	static const u8 nf_power[] = { 92, 89, 86, 83, 80, 75, 70, 65, 60, 55, 52 };
+-	struct mt7915_dev *dev = phy->dev;
+-	u32 val, sum = 0, n = 0;
+-	int nss, i;
+-
+-	for (nss = 0; nss < hweight8(phy->mt76->chainmask); nss++) {
+-		u32 reg = is_mt7915(&dev->mt76) ?
+-			MT_WF_IRPI_NSS(0, nss + (idx << dev->dbdc_support)) :
+-			MT_WF_IRPI_NSS_MT7916(idx, nss);
+-
+-		for (i = 0; i < ARRAY_SIZE(nf_power); i++, reg += 4) {
+-			val = mt76_rr(dev, reg);
+-			sum += val * nf_power[i];
+-			n += val;
+-		}
+-	}
+-
+-	if (!n)
+-		return 0;
+-
+-	return sum / n;
+-}
+-
+ void mt7915_update_channel(struct mt76_phy *mphy)
+ {
+ 	struct mt7915_phy *phy = mphy->priv;
+-	struct mt76_channel_state *state = mphy->chan_state;
+-	int nf;
+ 
+ 	mt7915_mcu_get_chan_mib_info(phy, false);
+-
+-	nf = mt7915_phy_get_nf(phy, phy->mt76->band_idx);
+-	if (!phy->noise)
+-		phy->noise = nf << 4;
+-	else if (nf)
+-		phy->noise += nf - (phy->noise >> 4);
+-
+-	state->noise = -(phy->noise >> 4);
+ }
+ 
+ static bool
+--- a/mt7915/main.c
++++ b/mt7915/main.c
+@@ -40,7 +40,8 @@ int mt7915_run(struct ieee80211_hw *hw)
+ 		if (ret)
+ 			goto out;
+ 
+-		mt7915_mac_enable_nf(dev, dev->phy.mt76->band_idx);
++		/* Retrieve noisefloor sample every 500 ms*/
++		mt7915_mcu_set_noisefloor(phy, true, 100, 5);
+ 	}
+ 
+ 	if (phy != &dev->phy) {
+@@ -53,8 +54,6 @@ int mt7915_run(struct ieee80211_hw *hw)
+ 					 true, true);
+ 		if (ret)
+ 			goto out;
+-
+-		mt7915_mac_enable_nf(dev, phy->mt76->band_idx);
+ 	}
+ 
+ 	ret = mt7915_mcu_set_thermal_throttling(phy,
+--- a/mt7915/mcu.c
++++ b/mt7915/mcu.c
+@@ -417,6 +417,81 @@ mt7915_mcu_rx_ps_sync(struct mt7915_dev
+ 	mt76_sta_ps_transition(&dev->mt76, wcid, !!p->ps_bit);
+ }
+ 
++static u16
++mt7915_mcu_noisefloor_calculate(u16 *noisefloor_antenna, u8 antenna_offset, u8 nss)
++{
++	u8 antenna_idx;
++	u16 noisefloor = 0;
++
++	if (!nss)
++		return 0;
++
++	for (antenna_idx = antenna_offset; antenna_idx < antenna_offset + nss; antenna_idx++)
++		noisefloor += noisefloor_antenna[antenna_idx];
++
++
++	return noisefloor / nss;
++}
++
++static u16
++mt7915_mcu_noisefloor_ipi_calculate(u32 *ipi_histogram)
++{
++	u32 nf_power[] = {92, 89, 86, 83, 80, 75, 70, 65, 60, 55, 52};
++	u32 ipi_histogram_samples_total = 0;
++	u32 ipi_histogram_samples;
++	u32 ipi = 0;
++	u8 i;
++
++	for (i = 0; i < MT7915_NF_IPI_HISTOGRAM_SIZE; i++) {
++		ipi_histogram_samples = le32_to_cpu(ipi_histogram[i]);
++		ipi_histogram_samples_total += ipi_histogram_samples;
++		ipi += nf_power[i] * ipi_histogram_samples;
++	}
++
++	return ipi_histogram_samples_total ? ipi / ipi_histogram_samples_total : 0;
++}
++
++static void
++mt7915_mcu_noisefloor_update_phy(struct mt7915_phy *phy, u16 *noisefloor_antenna,
++				 int antenna_band_offset)
++{
++	phy->noise = mt7915_mcu_noisefloor_calculate(noisefloor_antenna, antenna_band_offset,
++						     hweight8(phy->mt76->chainmask));
++	phy->mt76->chan_state->noise = -phy->noise;
++}
++
++static void
++mt7915_mcu_noisefloor_notify(struct mt7915_dev *dev, struct sk_buff *skb)
++{
++	struct mt7915_mcu_noisefloor_notify *n;
++	struct mt7915_phy *ext_phy = mt7915_ext_phy(dev);
++	int band_offset = is_mt7915(&dev->mt76) ? MT7915_NF_BAND1_OFFSET : MT7916_NF_BAND1_OFFSET;
++	u16 noisefloor[MT7915_NF_ANTENNA_COUNT_MAX] = {0};
++	u8 antenna;
++	u32 ip;
++
++	n = (struct mt7915_mcu_noisefloor_notify *)skb->data;
++
++	/* Calculate noisefloor for each antenna */
++	if (n->mode == MT7915_NOISEFLOOR_IDLE_POWER) {
++		for (antenna = 0; antenna < MT7915_NF_ANTENNA_COUNT_IP; antenna++) {
++			ip = FIELD_GET(MT7915_NF_IDLE_POWER_MASK,
++				       le32_to_cpu(n->average_power[antenna]));
++			noisefloor[antenna] = 128 - ip;
++		}
++	} else if (n->mode == MT7915_NOISEFLOOR_IDLE_POWER_INDICATOR) {
++		for (antenna = 0; antenna < MT7915_NF_ANTENNA_COUNT_IPI; antenna++)
++			noisefloor[antenna] = mt7915_mcu_noisefloor_ipi_calculate(n->average_ipi_histogram[antenna]);
++	} else {
++		return;
++	}
++
++	/* Update calculated noisefloor */
++	mt7915_mcu_noisefloor_update_phy(&dev->phy, noisefloor, 0);
++	if (ext_phy)
++		mt7915_mcu_noisefloor_update_phy(ext_phy, noisefloor, band_offset);
++}
++
+ static void
+ mt7915_mcu_rx_ext_event(struct mt7915_dev *dev, struct sk_buff *skb)
+ {
+@@ -442,6 +517,9 @@ mt7915_mcu_rx_ext_event(struct mt7915_de
+ 	case MCU_EXT_EVENT_PS_SYNC:
+ 		mt7915_mcu_rx_ps_sync(dev, skb);
+ 		break;
++	case MCU_EXT_CMD_ENABLE_NOISEFLOOR:
++		mt7915_mcu_noisefloor_notify(dev, skb);
++		break;
+ 	default:
+ 		break;
+ 	}
+@@ -472,6 +550,7 @@ void mt7915_mcu_rx_event(struct mt7915_d
+ 	     rxd->ext_eid == MCU_EXT_EVENT_FW_LOG_2_HOST ||
+ 	     rxd->ext_eid == MCU_EXT_EVENT_ASSERT_DUMP ||
+ 	     rxd->ext_eid == MCU_EXT_EVENT_PS_SYNC ||
++	     rxd->ext_eid == MCU_EXT_EVENT_NOISEFLOOR ||
+ 	     rxd->ext_eid == MCU_EXT_EVENT_BCC_NOTIFY ||
+ 	     !rxd->seq) &&
+ 	     !(rxd->eid == MCU_CMD_EXT_CID &&
+@@ -3610,6 +3689,25 @@ int mt7915_mcu_set_test_param(struct mt7
+ 				 sizeof(req), false);
+ }
+ 
++int mt7915_mcu_set_noisefloor(struct mt7915_phy *phy, bool enable, u8 timeout, u8 count)
++{
++	struct mt7915_dev *dev = phy->dev;
++	struct {
++		u8 enable;
++		u8 timeout;
++		u8 count;
++		u8 event_count;
++	} __packed req = {
++		.enable = enable,
++		.timeout = timeout,
++		.count = count,
++		.event_count = 0,
++	};
++
++	return mt76_mcu_send_msg(&dev->mt76, MCU_EXT_CMD(ENABLE_NOISEFLOOR), &req,
++				 sizeof(req), false);
++}
++
+ int mt7915_mcu_set_sku_en(struct mt7915_phy *phy)
+ {
+ 	struct mt7915_dev *dev = phy->dev;
+--- a/mt7915/mcu.h
++++ b/mt7915/mcu.h
+@@ -45,6 +45,15 @@ struct mt7915_mcu_csa_notify {
+ 	u8 rsv;
+ } __packed;
+ 
++struct mt7915_mcu_noisefloor_notify {
++	struct mt76_connac2_mcu_rxd_hdr rxd;
++
++	u8 mode;
++	u8 rsv[3];
++	u32 average_power[MT7915_NF_ANTENNA_COUNT_IP];
++	u32 average_ipi_histogram[MT7915_NF_ANTENNA_COUNT_IPI][MT7915_NF_IPI_HISTOGRAM_SIZE];
++} __packed;
++
+ struct mt7915_mcu_bcc_notify {
+ 	struct mt76_connac2_mcu_rxd_hdr rxd;
+ 
+@@ -522,6 +531,11 @@ enum {
+ 	SER_RECOVER
+ };
+ 
++enum {
++	MT7915_NOISEFLOOR_IDLE_POWER = 0,
++	MT7915_NOISEFLOOR_IDLE_POWER_INDICATOR = 1
++};
++
+ #define MT7915_MAX_BEACON_SIZE		1308
+ #define MT7915_BEACON_UPDATE_SIZE	(sizeof(struct sta_req_hdr) +	\
+ 					 sizeof(struct bss_info_bcn) +	\
+--- a/mt7915/mt7915.h
++++ b/mt7915/mt7915.h
+@@ -9,6 +9,14 @@
+ #include "../mt76_connac.h"
+ #include "regs.h"
+ 
++#define MT7915_NF_ANTENNA_COUNT_IP	4
++#define MT7915_NF_ANTENNA_COUNT_IPI	8
++#define MT7915_NF_ANTENNA_COUNT_MAX	MT7915_NF_ANTENNA_COUNT_IPI
++#define MT7915_NF_BAND1_OFFSET		2
++#define MT7916_NF_BAND1_OFFSET		4
++#define MT7915_NF_IPI_HISTOGRAM_SIZE	11
++#define MT7915_NF_IDLE_POWER_MASK	0xFE
++
+ #define MT7915_MAX_INTERFACES		19
+ #define MT7915_WTBL_SIZE		288
+ #define MT7916_WTBL_SIZE		544
+@@ -531,6 +539,7 @@ int mt7915_mcu_set_sku_en(struct mt7915_
+ int mt7915_mcu_set_txpower_sku(struct mt7915_phy *phy);
+ int mt7915_mcu_get_txpower_sku(struct mt7915_phy *phy, s8 *txpower, int len,
+ 			       u8 category);
++int mt7915_mcu_set_noisefloor(struct mt7915_phy *phy, bool enable, u8 timeout, u8 count);
+ int mt7915_mcu_set_txpower_frame_min(struct mt7915_phy *phy, s8 txpower);
+ int mt7915_mcu_set_txpower_frame(struct mt7915_phy *phy,
+ 				 struct ieee80211_vif *vif,
+@@ -599,7 +608,6 @@ u32 mt7915_mac_wtbl_lmac_addr(struct mt7
+ bool mt7915_mac_wtbl_update(struct mt7915_dev *dev, int idx, u32 mask);
+ void mt7915_mac_reset_counters(struct mt7915_phy *phy);
+ void mt7915_mac_cca_stats_reset(struct mt7915_phy *phy);
+-void mt7915_mac_enable_nf(struct mt7915_dev *dev, bool ext_phy);
+ void mt7915_mac_enable_rtscts(struct mt7915_dev *dev,
+ 			      struct ieee80211_vif *vif, bool enable);
+ void mt7915_mac_write_txwi(struct mt76_dev *dev, __le32 *txwi,
