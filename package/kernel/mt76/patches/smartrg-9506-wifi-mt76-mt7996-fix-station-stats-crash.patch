@@ -1,0 +1,18 @@
+--- a/mt7996/mcu.c
++++ b/mt7996/mcu.c
+@@ -799,6 +799,7 @@ mt7996_mcu_rx_all_sta_info_event(struct
+ 
+ 	res = (struct mt7996_mcu_all_sta_info_event *)skb->data;
+ 
++	rcu_read_lock();
+ 	for (i = 0; i < le16_to_cpu(res->sta_num); i++) {
+ 		u8 ac;
+ 		bool v1;
+@@ -917,6 +918,7 @@ mt7996_mcu_rx_all_sta_info_event(struct
+ 			break;
+ 		}
+ 	}
++	rcu_read_unlock();
+ }
+ 
+ static void
