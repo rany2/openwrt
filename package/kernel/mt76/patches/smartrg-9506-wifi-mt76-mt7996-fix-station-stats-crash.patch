@@ -1,0 +1,18 @@
+--- a/mt7996/mcu.c
++++ b/mt7996/mcu.c
+@@ -674,6 +674,7 @@ mt7996_mcu_rx_all_sta_info_event(struct
+ 
+ 	res = (struct mt7996_mcu_all_sta_info_event *)skb->data;
+ 
++	rcu_read_lock();
+ 	for (i = 0; i < le16_to_cpu(res->sta_num); i++) {
+ 		u8 ac;
+ 		u16 wlan_idx;
+@@ -720,6 +721,7 @@ mt7996_mcu_rx_all_sta_info_event(struct
+ 			break;
+ 		}
+ 	}
++	rcu_read_unlock();
+ }
+ 
+ static void
