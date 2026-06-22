@@ -1186,7 +1186,7 @@ makeCMV (u8 opcode, u8 group, u16 address, u16 index, int size, u16 * data, u16 
         CMVMSG[2] = address;
         CMVMSG[3] = index;
         if (opcode == H2D_CMV_WRITE)
-                memcpy (CMVMSG + 4, data, size * 2);
+                memcpy (CMVMSG + 4, data, min_t(int, size, MSG_LENGTH - 4) * 2);
         return;
 }
 
